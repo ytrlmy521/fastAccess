@@ -1,0 +1,186 @@
+import { LineEdit, ScrollView } from "std-widgets.slint";
+
+export struct UiRecentItem {
+    name: string,
+    path: string,
+    kind: string,
+}
+
+export component AppWindow inherits Window {
+    title: "FastAccess";
+    min-width: 720px;
+    min-height: 520px;
+    background: #11151d;
+
+    in-out property <string> query;
+    in property <[UiRecentItem]> results;
+    in-out property <int> selected-index: results.length > 0 ? 0 : -1;
+    in property <string> status-text: "Loading recent items…";
+
+    callback search-changed(string);
+    callback open-requested(int);
+    callback dismiss-requested();
+    callback quit-requested();
+
+    forward-focus: keyboard-scope;
+
+    keyboard-scope := FocusScope {
+        forward-focus: search-input;
+
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => { root.dismiss-requested(); }
+        }
+        KeyBinding {
+            keys: @keys(DownArrow);
+            activated => {
+                if root.results.length > 0 {
+                    root.selected-index = min(root.selected-index + 1, root.results.length - 1);
+                }
+            }
+        }
+        KeyBinding {
+            keys: @keys(UpArrow);
+            activated => {
+                if root.results.length > 0 {
+                    root.selected-index = max(root.selected-index - 1, 0);
+                }
+            }
+        }
+        KeyBinding {
+            keys: @keys(Return);
+            activated => {
+                if root.selected-index >= 0 {
+                    root.open-requested(root.selected-index);
+                }
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + Q);
+            activated => { root.quit-requested(); }
+        }
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+
+            Rectangle {
+                height: 52px;
+                border-radius: 10px;
+                background: #1b2230;
+                border-width: 1px;
+                border-color: search-input.has-focus ? #5b8cff : #303a4b;
+
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 12px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "⌕";
+                        color: #8ea7d8;
+                        font-size: 26px;
+                        vertical-alignment: center;
+                    }
+
+                    search-input := LineEdit {
+                        text <=> root.query;
+                        placeholder-text: "Search Windows Recent…";
+                        edited(text) => {
+                            root.selected-index = root.results.length > 0 ? 0 : -1;
+                            root.search-changed(text);
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                border-radius: 10px;
+                background: #161c27;
+                clip: true;
+
+                if results.length == 0: Text {
+                    text: root.status-text;
+                    color: #8792a5;
+                    font-size: 15px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                if results.length > 0: ScrollView {
+                    VerticalLayout {
+                        spacing: 2px;
+
+                        for item[index] in root.results: Rectangle {
+                            height: 62px;
+                            background: index == root.selected-index ? #26385f : touch.has-hover ? #202a3a : transparent;
+                            border-radius: 7px;
+
+                            HorizontalLayout {
+                                padding-left: 14px;
+                                padding-right: 14px;
+                                spacing: 12px;
+
+                                Rectangle {
+                                    width: 34px;
+                                    height: 34px;
+                                    border-radius: 8px;
+                                    background: item.kind == "Folder" ? #574b29 : #263d61;
+
+                                    Text {
+                                        text: item.kind == "Folder" ? "▰" : "□";
+                                        color: item.kind == "Folder" ? #ffd36b : #8fb8ff;
+                                        font-size: 17px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 3px;
+
+                                    Text {
+                                        text: item.name;
+                                        color: #f1f5fb;
+                                        font-size: 15px;
+                                        overflow: elide;
+                                    }
+                                    Text {
+                                        text: item.path;
+                                        color: #8692a7;
+                                        font-size: 12px;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+
+                            touch := TouchArea {
+                                clicked => {
+                                    root.selected-index = index;
+                                    root.open-requested(index);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                height: 22px;
+
+                Text {
+                    text: "↑↓ Select   Enter Open   Esc Hide   Ctrl+Q Quit";
+                    color: #69768b;
+                    font-size: 11px;
+                }
+                Text {
+                    text: "Alt + Shift + Space";
+                    color: #69768b;
+                    font-size: 11px;
+                    horizontal-alignment: right;
+                }
+            }
+        }
+    }
+}

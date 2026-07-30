@@ -81,11 +81,13 @@ export component AppWindow inherits Window {
                         color: #8ea7d8;
                         font-size: 26px;
                         vertical-alignment: center;
+                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                     }
 
                     search-input := LineEdit {
                         text <=> root.query;
                         placeholder-text: "Search Windows Recent…";
+                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                         edited(text) => {
                             root.selected-index = root.results.length > 0 ? 0 : -1;
                             root.search-changed(text);
@@ -105,6 +107,7 @@ export component AppWindow inherits Window {
                     font-size: 15px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
+                    font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                 }
 
                 if results.length > 0: ScrollView {
@@ -133,6 +136,7 @@ export component AppWindow inherits Window {
                                         font-size: 17px;
                                         horizontal-alignment: center;
                                         vertical-alignment: center;
+                                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                                     }
                                 }
 
@@ -145,12 +149,14 @@ export component AppWindow inherits Window {
                                         color: #f1f5fb;
                                         font-size: 15px;
                                         overflow: elide;
+                                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                                     }
                                     Text {
                                         text: item.path;
                                         color: #8692a7;
                                         font-size: 12px;
                                         overflow: elide;
+                                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                                     }
                                 }
                             }
@@ -173,12 +179,14 @@ export component AppWindow inherits Window {
                     text: "↑↓ Select   Enter Open   Esc Hide   Ctrl+Q Quit";
                     color: #69768b;
                     font-size: 11px;
+                    font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                 }
                 Text {
                     text: "Alt + Shift + Space";
                     color: #69768b;
                     font-size: 11px;
                     horizontal-alignment: right;
+                    font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                 }
             }
         }

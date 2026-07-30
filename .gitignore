@@ -3,4 +3,5 @@
 /.vscode/
 *.pdb
 *.tmp
+/dist/
 

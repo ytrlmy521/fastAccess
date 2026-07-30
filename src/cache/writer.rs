@@ -67,10 +67,8 @@ impl CacheWriter {
                     }
 
                     let save_result = match items.read() {
-                        Ok(items) => {
-                            save_cache(&cache_file, items.as_slice())
-                                .map_err(|error| error.to_string())
-                        }
+                        Ok(items) => save_cache(&cache_file, items.as_slice())
+                            .map_err(|error| error.to_string()),
                         Err(error) => Err(format!("recent history lock is poisoned: {error}")),
                     };
                     for waiter in flush_waiters {

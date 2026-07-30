@@ -1,8 +1,8 @@
-use anyhow::Result;
 #[cfg(windows)]
 use anyhow::bail;
 #[cfg(not(windows))]
 use anyhow::Context;
+use anyhow::Result;
 use std::path::Path;
 
 #[cfg(windows)]
@@ -31,6 +31,8 @@ pub fn open_target(path: &Path) -> Result<()> {
 
 #[cfg(not(windows))]
 pub fn open_target(_path: &Path) -> Result<()> {
-    Err(anyhow::anyhow!("opening targets is supported only on Windows"))
-        .context("platform operation unavailable")
+    Err(anyhow::anyhow!(
+        "opening targets is supported only on Windows"
+    ))
+    .context("platform operation unavailable")
 }

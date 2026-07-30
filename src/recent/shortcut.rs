@@ -24,4 +24,3 @@ pub fn parse_shortcut(path: &Path, observed_at_ms: u64) -> Result<RecentItem> {
 
     Ok(RecentItem::new(target, observed_at_ms, kind))
 }
-

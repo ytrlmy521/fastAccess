@@ -3,4 +3,3 @@ pub mod model;
 pub mod platform;
 pub mod recent;
 pub mod search;
-

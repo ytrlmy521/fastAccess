@@ -22,7 +22,9 @@ pub fn scan_recent() -> Result<ScanReport> {
     let folder = recent_folder()?;
     scan_lnk_directory(&folder, &mut report, &mut seen)?;
 
-    report.items.sort_unstable_by(|a, b| b.observed_at_ms.cmp(&a.observed_at_ms));
+    report
+        .items
+        .sort_unstable_by(|a, b| b.observed_at_ms.cmp(&a.observed_at_ms));
     Ok(report)
 }
 
@@ -31,8 +33,12 @@ fn scan_lnk_directory(
     report: &mut ScanReport,
     seen: &mut HashSet<String>,
 ) -> Result<()> {
-    let entries = fs::read_dir(directory)
-        .with_context(|| format!("cannot read Windows Recent directory {}", directory.display()))?;
+    let entries = fs::read_dir(directory).with_context(|| {
+        format!(
+            "cannot read Windows Recent directory {}",
+            directory.display()
+        )
+    })?;
 
     let mut candidates = Vec::new();
     for entry in entries.flatten() {

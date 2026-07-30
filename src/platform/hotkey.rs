@@ -45,9 +45,7 @@ where
         })?;
 
     if !ready_rx.recv()? {
-        bail!(
-            "cannot register Alt+Shift+Space; it may already be used by another application"
-        );
+        bail!("cannot register Alt+Shift+Space; it may already be used by another application");
     }
     Ok(handle)
 }
@@ -59,4 +57,3 @@ where
 {
     bail!("global hotkeys are supported only on Windows")
 }
-

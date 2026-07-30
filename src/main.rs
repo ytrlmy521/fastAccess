@@ -28,8 +28,8 @@ fn main() -> Result<()> {
     cached_items.sort_unstable_by(|a, b| b.observed_at_ms.cmp(&a.observed_at_ms));
     cached_items.truncate(MAX_RECENT_ITEMS);
     let items = Arc::new(RwLock::new(cached_items));
-    let cache_writer = CacheWriter::start(Arc::clone(&items), cache_file)
-        .context("cannot start cache writer")?;
+    let cache_writer =
+        CacheWriter::start(Arc::clone(&items), cache_file).context("cannot start cache writer")?;
 
     install_ui_callbacks(&app, Arc::clone(&items), cache_writer.clone());
     let explorer_items = Arc::clone(&items);
@@ -60,12 +60,9 @@ fn main() -> Result<()> {
     app.window()
         .on_close_requested(|| slint::CloseRequestResponse::HideWindow);
     render_query(&app, &items, "");
-    let recent_collector = RecentCollector::start(
-        app.as_weak(),
-        Arc::clone(&items),
-        cache_writer.clone(),
-    )
-    .context("cannot start Windows Recent collector")?;
+    let recent_collector =
+        RecentCollector::start(app.as_weak(), Arc::clone(&items), cache_writer.clone())
+            .context("cannot start Windows Recent collector")?;
     recent_collector.request_refresh();
     start_hotkey(
         app.as_weak(),

@@ -1,6 +1,6 @@
-use anyhow::{bail, Result};
 #[cfg(windows)]
 use anyhow::Context;
+use anyhow::{bail, Result};
 use std::path::PathBuf;
 
 #[cfg(windows)]
@@ -111,16 +111,12 @@ mod win32 {
     const DISPID_WINDOWREVOKED: i32 = 201;
 
     const IID_NULL: GUID = GUID::from_u128(0);
-    const IID_IUNKNOWN: GUID =
-        GUID::from_u128(0x00000000_0000_0000_c000_000000000046);
-    const IID_IDISPATCH: GUID =
-        GUID::from_u128(0x00020400_0000_0000_c000_000000000046);
+    const IID_IUNKNOWN: GUID = GUID::from_u128(0x00000000_0000_0000_c000_000000000046);
+    const IID_IDISPATCH: GUID = GUID::from_u128(0x00020400_0000_0000_c000_000000000046);
     const IID_ICONNECTIONPOINTCONTAINER: GUID =
         GUID::from_u128(0xb196b284_bab4_101a_b69c_00aa00341d07);
-    const DIID_DWEBBROWSEREVENTS2: GUID =
-        GUID::from_u128(0x34a715a0_6587_11d0_924a_0020afc7ac4d);
-    const DIID_DSHELLWINDOWSEVENTS: GUID =
-        GUID::from_u128(0xfe4106e0_399a_11d0_a48c_00a0c90a8f39);
+    const DIID_DWEBBROWSEREVENTS2: GUID = GUID::from_u128(0x34a715a0_6587_11d0_924a_0020afc7ac4d);
+    const DIID_DSHELLWINDOWSEVENTS: GUID = GUID::from_u128(0xfe4106e0_399a_11d0_a48c_00a0c90a8f39);
 
     #[repr(C)]
     struct IDispatchRaw {
@@ -130,21 +126,13 @@ mod win32 {
     #[repr(C)]
     #[allow(dead_code)]
     struct IDispatchVTable {
-        query_interface: unsafe extern "system" fn(
-            *mut IDispatchRaw,
-            *const GUID,
-            *mut *mut c_void,
-        ) -> i32,
+        query_interface:
+            unsafe extern "system" fn(*mut IDispatchRaw, *const GUID, *mut *mut c_void) -> i32,
         add_ref: unsafe extern "system" fn(*mut IDispatchRaw) -> u32,
         release: unsafe extern "system" fn(*mut IDispatchRaw) -> u32,
-        get_type_info_count:
-            unsafe extern "system" fn(*mut IDispatchRaw, *mut u32) -> i32,
-        get_type_info: unsafe extern "system" fn(
-            *mut IDispatchRaw,
-            u32,
-            u32,
-            *mut *mut c_void,
-        ) -> i32,
+        get_type_info_count: unsafe extern "system" fn(*mut IDispatchRaw, *mut u32) -> i32,
+        get_type_info:
+            unsafe extern "system" fn(*mut IDispatchRaw, u32, u32, *mut *mut c_void) -> i32,
         get_ids_of_names: unsafe extern "system" fn(
             *mut IDispatchRaw,
             *const GUID,
@@ -179,14 +167,10 @@ mod win32 {
             *const GUID,
             *mut *mut c_void,
         ) -> i32,
-        add_ref:
-            unsafe extern "system" fn(*mut IConnectionPointContainerRaw) -> u32,
-        release:
-            unsafe extern "system" fn(*mut IConnectionPointContainerRaw) -> u32,
-        enum_connection_points: unsafe extern "system" fn(
-            *mut IConnectionPointContainerRaw,
-            *mut *mut c_void,
-        ) -> i32,
+        add_ref: unsafe extern "system" fn(*mut IConnectionPointContainerRaw) -> u32,
+        release: unsafe extern "system" fn(*mut IConnectionPointContainerRaw) -> u32,
+        enum_connection_points:
+            unsafe extern "system" fn(*mut IConnectionPointContainerRaw, *mut *mut c_void) -> i32,
         find_connection_point: unsafe extern "system" fn(
             *mut IConnectionPointContainerRaw,
             *const GUID,
@@ -215,13 +199,8 @@ mod win32 {
             *mut IConnectionPointRaw,
             *mut *mut IConnectionPointContainerRaw,
         ) -> i32,
-        advise: unsafe extern "system" fn(
-            *mut IConnectionPointRaw,
-            *mut c_void,
-            *mut u32,
-        ) -> i32,
-        unadvise:
-            unsafe extern "system" fn(*mut IConnectionPointRaw, u32) -> i32,
+        advise: unsafe extern "system" fn(*mut IConnectionPointRaw, *mut c_void, *mut u32) -> i32,
+        unadvise: unsafe extern "system" fn(*mut IConnectionPointRaw, u32) -> i32,
         enum_connections:
             unsafe extern "system" fn(*mut IConnectionPointRaw, *mut *mut c_void) -> i32,
     }
@@ -249,10 +228,7 @@ mod win32 {
         callback: Box<dyn Fn(PathBuf) + Send>,
         ready: std::sync::mpsc::SyncSender<Result<u32, String>>,
     ) {
-        let init_result = CoInitializeEx(
-            ptr::null(),
-            COINIT_APARTMENTTHREADED as u32,
-        );
+        let init_result = CoInitializeEx(ptr::null(), COINIT_APARTMENTTHREADED as u32);
         if init_result < 0 {
             let _ = ready.send(Err(format!(
                 "CoInitializeEx failed: HRESULT 0x{:08X}",
@@ -263,13 +239,7 @@ mod win32 {
 
         let thread_id = GetCurrentThreadId();
         let mut queue_message: MSG = zeroed();
-        PeekMessageW(
-            &mut queue_message,
-            ptr::null_mut(),
-            0,
-            0,
-            PM_NOREMOVE,
-        );
+        PeekMessageW(&mut queue_message, ptr::null_mut(), 0, 0, PM_NOREMOVE);
 
         let shell_windows = match create_shell_windows() {
             Ok(dispatch) => dispatch,
@@ -281,24 +251,18 @@ mod win32 {
         };
 
         let sink = create_event_sink(thread_id, callback);
-        let shell_subscription =
-            match subscribe(shell_windows, &DIID_DSHELLWINDOWSEVENTS, sink) {
-                Ok(subscription) => subscription,
-                Err(message) => {
-                    let _ = ready.send(Err(message));
-                    dispatch_release(sink);
-                    dispatch_release(shell_windows);
-                    CoUninitialize();
-                    return;
-                }
-            };
+        let shell_subscription = match subscribe(shell_windows, &DIID_DSHELLWINDOWSEVENTS, sink) {
+            Ok(subscription) => subscription,
+            Err(message) => {
+                let _ = ready.send(Err(message));
+                dispatch_release(sink);
+                dispatch_release(shell_windows);
+                CoUninitialize();
+                return;
+            }
+        };
         let mut browser_subscriptions = Vec::new();
-        refresh_browser_subscriptions(
-            shell_windows,
-            sink,
-            &mut browser_subscriptions,
-            false,
-        );
+        refresh_browser_subscriptions(shell_windows, sink, &mut browser_subscriptions, false);
 
         if ready.send(Ok(thread_id)).is_err() {
             cleanup_subscription(shell_subscription);
@@ -395,11 +359,8 @@ mod win32 {
         }
 
         let mut cookie = 0;
-        let advise_result = ((*(*connection_point).vtable).advise)(
-            connection_point,
-            sink.cast(),
-            &mut cookie,
-        );
+        let advise_result =
+            ((*(*connection_point).vtable).advise)(connection_point, sink.cast(), &mut cookie);
         if advise_result < 0 {
             ((*(*connection_point).vtable).release)(connection_point);
             return Err(format!(
@@ -453,9 +414,7 @@ mod win32 {
                 .iter()
                 .any(|subscription| subscription.identity == identity)
             {
-                if let Ok(subscription) =
-                    subscribe(dispatch, &DIID_DWEBBROWSEREVENTS2, sink)
-                {
+                if let Ok(subscription) = subscribe(dispatch, &DIID_DWEBBROWSEREVENTS2, sink) {
                     subscriptions.push(BrowserSubscription {
                         identity,
                         subscription,
@@ -469,9 +428,7 @@ mod win32 {
         }
     }
 
-    unsafe fn cleanup_browser_subscriptions(
-        subscriptions: &mut Vec<BrowserSubscription>,
-    ) {
+    unsafe fn cleanup_browser_subscriptions(subscriptions: &mut Vec<BrowserSubscription>) {
         for subscription in subscriptions.drain(..) {
             cleanup_subscription(subscription.subscription);
         }
@@ -486,18 +443,13 @@ mod win32 {
             subscription.connection_point,
             subscription.cookie,
         );
-        ((*(*subscription.connection_point).vtable).release)(
-            subscription.connection_point,
-        );
+        ((*(*subscription.connection_point).vtable).release)(subscription.connection_point);
     }
 
     unsafe fn dispatch_identity(dispatch: *mut IDispatchRaw) -> Option<usize> {
         let mut identity = ptr::null_mut();
-        let result = ((*(*dispatch).vtable).query_interface)(
-            dispatch,
-            &IID_IUNKNOWN,
-            &mut identity,
-        );
+        let result =
+            ((*(*dispatch).vtable).query_interface)(dispatch, &IID_IUNKNOWN, &mut identity);
         if result < 0 || identity.is_null() {
             return None;
         }
@@ -516,10 +468,7 @@ mod win32 {
             .is_some_and(|name| name.eq_ignore_ascii_case("explorer.exe"))
     }
 
-    unsafe fn dispatch_i32_property(
-        dispatch: *mut IDispatchRaw,
-        name: &str,
-    ) -> Option<i32> {
+    unsafe fn dispatch_i32_property(dispatch: *mut IDispatchRaw, name: &str) -> Option<i32> {
         let mut result = dispatch_invoke(dispatch, name, DISPATCH_PROPERTYGET, &mut [])?;
         let value = if variant_type(&result) == VT_I4 {
             Some(result.Anonymous.Anonymous.Anonymous.lVal)
@@ -530,10 +479,7 @@ mod win32 {
         value
     }
 
-    unsafe fn dispatch_string_property(
-        dispatch: *mut IDispatchRaw,
-        name: &str,
-    ) -> Option<String> {
+    unsafe fn dispatch_string_property(dispatch: *mut IDispatchRaw, name: &str) -> Option<String> {
         let mut result = dispatch_invoke(dispatch, name, DISPATCH_PROPERTYGET, &mut [])?;
         let value = if variant_type(&result) == VT_BSTR {
             let bstr = result.Anonymous.Anonymous.Anonymous.bstrVal;
@@ -552,10 +498,7 @@ mod win32 {
         value
     }
 
-    unsafe fn dispatch_item(
-        dispatch: *mut IDispatchRaw,
-        index: i32,
-    ) -> Option<*mut IDispatchRaw> {
+    unsafe fn dispatch_item(dispatch: *mut IDispatchRaw, index: i32) -> Option<*mut IDispatchRaw> {
         let mut argument: VARIANT = zeroed();
         argument.Anonymous.Anonymous.vt = VT_I4;
         argument.Anonymous.Anonymous.Anonymous.lVal = index;
@@ -567,8 +510,7 @@ mod win32 {
             std::slice::from_mut(&mut argument),
         )?;
         let value = if variant_type(&result) == VT_DISPATCH {
-            let value = result.Anonymous.Anonymous.Anonymous.pdispVal
-                as *mut IDispatchRaw;
+            let value = result.Anonymous.Anonymous.Anonymous.pdispVal as *mut IDispatchRaw;
             if value.is_null() {
                 None
             } else {
@@ -618,10 +560,7 @@ mod win32 {
         Some(result)
     }
 
-    unsafe fn dispatch_id(
-        dispatch: *mut IDispatchRaw,
-        name: &str,
-    ) -> Option<i32> {
+    unsafe fn dispatch_id(dispatch: *mut IDispatchRaw, name: &str) -> Option<i32> {
         let mut wide: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
         let mut name_pointer = wide.as_mut_ptr();
         let mut dispatch_id = 0;
@@ -651,19 +590,17 @@ mod win32 {
     }
 
     unsafe fn path_from_url(url: &str) -> Option<PathBuf> {
-        if !url.get(..5).is_some_and(|prefix| prefix.eq_ignore_ascii_case("file:")) {
+        if !url
+            .get(..5)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("file:"))
+        {
             return None;
         }
 
         let wide: Vec<u16> = url.encode_utf16().chain(Some(0)).collect();
         let mut buffer = vec![0u16; 32_768];
         let mut length = buffer.len() as u32;
-        let result = PathCreateFromUrlW(
-            wide.as_ptr(),
-            buffer.as_mut_ptr(),
-            &mut length,
-            0,
-        );
+        let result = PathCreateFromUrlW(wide.as_ptr(), buffer.as_mut_ptr(), &mut length, 0);
         if result < 0 || length == 0 {
             return None;
         }
@@ -754,12 +691,7 @@ mod win32 {
         let sink = &*(this as *mut EventSink);
         match dispatch_id {
             DISPID_WINDOWREGISTERED | DISPID_WINDOWREVOKED => {
-                PostThreadMessageW(
-                    sink.owner_thread_id,
-                    WM_REFRESH_SUBSCRIPTIONS,
-                    0,
-                    0,
-                );
+                PostThreadMessageW(sink.owner_thread_id, WM_REFRESH_SUBSCRIPTIONS, 0, 0);
             }
             DISPID_NAVIGATECOMPLETE2 => {
                 if let Some(dispatch) = event_dispatch(parameters) {
@@ -778,18 +710,14 @@ mod win32 {
         let sink = &*(sink_dispatch as *mut EventSink);
         if let Some(url) = dispatch_string_property(browser_dispatch, "LocationURL") {
             if let Some(path) = path_from_url(&url) {
-                let _ = std::panic::catch_unwind(
-                    std::panic::AssertUnwindSafe(|| {
-                        (sink.callback.as_ref())(path)
-                    }),
-                );
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    (sink.callback.as_ref())(path)
+                }));
             }
         }
     }
 
-    unsafe fn event_dispatch(
-        parameters: *mut DISPPARAMS,
-    ) -> Option<*mut IDispatchRaw> {
+    unsafe fn event_dispatch(parameters: *mut DISPPARAMS) -> Option<*mut IDispatchRaw> {
         if parameters.is_null() {
             return None;
         }
@@ -800,10 +728,7 @@ mod win32 {
         std::slice::from_raw_parts(parameters.rgvarg, parameters.cArgs as usize)
             .iter()
             .find(|argument| variant_type(argument) == VT_DISPATCH)
-            .map(|argument| {
-                argument.Anonymous.Anonymous.Anonymous.pdispVal
-                    as *mut IDispatchRaw
-            })
+            .map(|argument| argument.Anonymous.Anonymous.Anonymous.pdispVal as *mut IDispatchRaw)
             .filter(|dispatch| !dispatch.is_null())
     }
 
@@ -838,8 +763,10 @@ mod win32 {
 
         #[test]
         fn ignores_virtual_shell_urls() {
-            assert!(unsafe { path_from_url("shell:::{679F85CB-0220-4080-B29B-5540CC05AAB6}") }
-                .is_none());
+            assert!(
+                unsafe { path_from_url("shell:::{679F85CB-0220-4080-B29B-5540CC05AAB6}") }
+                    .is_none()
+            );
         }
     }
 }

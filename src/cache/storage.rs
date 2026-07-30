@@ -169,4 +169,3 @@ mod tests {
         let _ = fs::remove_dir(directory);
     }
 }
-

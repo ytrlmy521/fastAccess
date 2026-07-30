@@ -10,14 +10,8 @@ pub fn recent_folder() -> Result<PathBuf> {
     use windows_sys::Win32::UI::Shell::{FOLDERID_Recent, SHGetKnownFolderPath};
 
     let mut raw_path = ptr::null_mut();
-    let result = unsafe {
-        SHGetKnownFolderPath(
-            &FOLDERID_Recent,
-            0,
-            ptr::null_mut(),
-            &mut raw_path,
-        )
-    };
+    let result =
+        unsafe { SHGetKnownFolderPath(&FOLDERID_Recent, 0, ptr::null_mut(), &mut raw_path) };
 
     if result < 0 {
         bail!("SHGetKnownFolderPath(FOLDERID_Recent) failed: HRESULT 0x{result:08X}");
@@ -45,4 +39,3 @@ pub fn recent_folder() -> Result<PathBuf> {
 pub fn recent_folder() -> Result<PathBuf> {
     bail!("Windows Recent Items is available only on Windows")
 }
-

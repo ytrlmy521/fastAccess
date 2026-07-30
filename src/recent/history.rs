@@ -8,18 +8,11 @@ use std::{
 pub const MAX_RECENT_ITEMS: usize = 500;
 const DUPLICATE_EVENT_WINDOW_MS: u64 = 1_500;
 
-pub fn mark_accessed(
-    items: &mut Vec<RecentItem>,
-    target: PathBuf,
-    kind: ItemKind,
-) -> bool {
+pub fn mark_accessed(items: &mut Vec<RecentItem>, target: PathBuf, kind: ItemKind) -> bool {
     mark_accessed_at(items, target, kind, now_ms())
 }
 
-pub fn merge_recent_items(
-    existing: &[RecentItem],
-    discovered: Vec<RecentItem>,
-) -> Vec<RecentItem> {
+pub fn merge_recent_items(existing: &[RecentItem], discovered: Vec<RecentItem>) -> Vec<RecentItem> {
     let mut by_target = HashMap::<String, RecentItem>::new();
 
     for item in existing.iter().cloned().chain(discovered) {
@@ -89,12 +82,7 @@ mod tests {
     fn accessed_item_moves_to_the_front_without_duplicates() {
         let mut items = vec![item("new.txt", 20), item("old.txt", 10)];
 
-        let changed = mark_accessed_at(
-            &mut items,
-            PathBuf::from("old.txt"),
-            ItemKind::File,
-            30,
-        );
+        let changed = mark_accessed_at(&mut items, PathBuf::from("old.txt"), ItemKind::File, 30);
 
         assert!(changed);
         assert_eq!(items.len(), 2);
@@ -123,12 +111,7 @@ mod tests {
             .map(|index| item(&format!("{index}.txt"), index as u64))
             .collect();
 
-        mark_accessed_at(
-            &mut items,
-            PathBuf::from("new.txt"),
-            ItemKind::File,
-            10_000,
-        );
+        mark_accessed_at(&mut items, PathBuf::from("new.txt"), ItemKind::File, 10_000);
 
         assert_eq!(items.len(), MAX_RECENT_ITEMS);
         assert_eq!(items[0].display_name, "new.txt");
@@ -137,10 +120,7 @@ mod tests {
     #[test]
     fn merge_keeps_the_newest_observation_for_each_target() {
         let existing = vec![item(r"C:\Work\report.docx", 30), item("cached.txt", 20)];
-        let discovered = vec![
-            item(r"c:\work\REPORT.docx", 10),
-            item("system.txt", 40),
-        ];
+        let discovered = vec![item(r"c:\work\REPORT.docx", 10), item("system.txt", 40)];
 
         let merged = merge_recent_items(&existing, discovered);
 

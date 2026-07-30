@@ -3,6 +3,7 @@ import { LineEdit, ScrollView } from "std-widgets.slint";
 export struct UiRecentItem {
     name: string,
     path: string,
+    accessed: string,
     kind: string,
 }
 
@@ -76,12 +77,11 @@ export component AppWindow inherits Window {
                     padding-right: 12px;
                     spacing: 10px;
 
-                    Text {
-                        text: "⌕";
-                        color: #8ea7d8;
-                        font-size: 26px;
-                        vertical-alignment: center;
-                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
+                    Image {
+                        width: 21px;
+                        height: 21px;
+                        source: @image-url("icons/search.svg");
+                        colorize: #8ea7d8;
                     }
 
                     search-input := LineEdit {
@@ -93,6 +93,34 @@ export component AppWindow inherits Window {
                             root.search-changed(text);
                         }
                     }
+                }
+            }
+
+            HorizontalLayout {
+                height: 24px;
+                spacing: 8px;
+
+                Image {
+                    width: 15px;
+                    height: 15px;
+                    source: @image-url("icons/clock-3.svg");
+                    colorize: #718099;
+                }
+                Text {
+                    text: "RECENTLY ACCESSED";
+                    color: #718099;
+                    font-size: 11px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
+                }
+                Text {
+                    text: root.results.length + (root.results.length == 1 ? " item" : " items");
+                    color: #58667d;
+                    font-size: 11px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                    font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                 }
             }
 
@@ -130,13 +158,15 @@ export component AppWindow inherits Window {
                                     border-radius: 8px;
                                     background: item.kind == "Folder" ? #574b29 : #263d61;
 
-                                    Text {
-                                        text: item.kind == "Folder" ? "▰" : "□";
-                                        color: item.kind == "Folder" ? #ffd36b : #8fb8ff;
-                                        font-size: 17px;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
-                                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
+                                    Image {
+                                        x: 8px;
+                                        y: 8px;
+                                        width: 18px;
+                                        height: 18px;
+                                        source: item.kind == "Folder"
+                                            ? @image-url("icons/folder.svg")
+                                            : @image-url("icons/file.svg");
+                                        colorize: item.kind == "Folder" ? #ffd36b : #8fb8ff;
                                     }
                                 }
 
@@ -158,6 +188,23 @@ export component AppWindow inherits Window {
                                         overflow: elide;
                                         font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
                                     }
+                                }
+
+                                Text {
+                                    width: 74px;
+                                    text: item.accessed;
+                                    color: #6f7e94;
+                                    font-size: 11px;
+                                    horizontal-alignment: right;
+                                    vertical-alignment: center;
+                                    font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
+                                }
+
+                                Image {
+                                    width: 15px;
+                                    height: 15px;
+                                    source: @image-url("icons/external-link.svg");
+                                    colorize: index == root.selected-index ? #a9c3ff : #607089;
                                 }
                             }
 

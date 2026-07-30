@@ -10,7 +10,7 @@ pub enum ItemKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecentItem {
-    /// The target resolved from the Windows shortcut.
+    /// Filesystem target observed from Explorer or resolved from a Recent shortcut.
     pub target: PathBuf,
     /// Filename or final folder component used by the UI.
     pub display_name: String,

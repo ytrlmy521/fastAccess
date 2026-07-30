@@ -1,4 +1,4 @@
-import { LineEdit, ScrollView } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
 
 export struct UiRecentItem {
     name: string,
@@ -9,6 +9,8 @@ export struct UiRecentItem {
 
 export component AppWindow inherits Window {
     title: "FastAccess";
+    icon: @image-url("icons/app.svg");
+    always-on-top: true;
     min-width: 720px;
     min-height: 520px;
     background: #11151d;
@@ -28,34 +30,30 @@ export component AppWindow inherits Window {
     keyboard-scope := FocusScope {
         forward-focus: search-input;
 
-        KeyBinding {
-            keys: @keys(Escape);
-            activated => { root.dismiss-requested(); }
-        }
-        KeyBinding {
-            keys: @keys(DownArrow);
-            activated => {
+        capture-key-pressed(event) => {
+            if event.text == Key.DownArrow {
                 if root.results.length > 0 {
                     root.selected-index = min(root.selected-index + 1, root.results.length - 1);
                 }
-            }
-        }
-        KeyBinding {
-            keys: @keys(UpArrow);
-            activated => {
+                accept
+            } else if event.text == Key.UpArrow {
                 if root.results.length > 0 {
                     root.selected-index = max(root.selected-index - 1, 0);
                 }
-            }
-        }
-        KeyBinding {
-            keys: @keys(Return);
-            activated => {
+                accept
+            } else if event.text == Key.Return {
                 if root.selected-index >= 0 {
                     root.open-requested(root.selected-index);
                 }
+                accept
+            } else if event.text == Key.Escape {
+                root.dismiss-requested();
+                accept
+            } else {
+                reject
             }
         }
+
         KeyBinding {
             keys: @keys(Control + Q);
             activated => { root.quit-requested(); }
@@ -73,24 +71,57 @@ export component AppWindow inherits Window {
                 border-color: search-input.has-focus ? #5b8cff : #303a4b;
 
                 HorizontalLayout {
-                    padding-left: 16px;
-                    padding-right: 12px;
-                    spacing: 10px;
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    spacing: 11px;
 
                     Image {
-                        width: 21px;
-                        height: 21px;
+                        width: 20px;
+                        height: 20px;
                         source: @image-url("icons/search.svg");
                         colorize: #8ea7d8;
                     }
 
-                    search-input := LineEdit {
-                        text <=> root.query;
-                        placeholder-text: "Search Windows Recent…";
-                        font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
-                        edited(text) => {
-                            root.selected-index = root.results.length > 0 ? 0 : -1;
-                            root.search-changed(text);
+                    input-viewport := Rectangle {
+                        horizontal-stretch: 1;
+                        clip: true;
+
+                        search-input := TextInput {
+                            width: max(parent.width, self.preferred-width);
+                            height: parent.height;
+                            text <=> root.query;
+                            color: #edf3ff;
+                            selection-foreground-color: #ffffff;
+                            selection-background-color: #446fca;
+                            font-size: 14px;
+                            font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
+                            vertical-alignment: center;
+                            input-type: search;
+                            accessible-placeholder-text: "Search Windows Recent";
+                            edited() => {
+                                root.selected-index = root.results.length > 0 ? 0 : -1;
+                                root.search-changed(self.text);
+                            }
+                            accepted() => {
+                                if root.selected-index >= 0 {
+                                    root.open-requested(root.selected-index);
+                                }
+                            }
+                            cursor-position-changed(cursor-position) => {
+                                if cursor-position.x + self.x < 2px {
+                                    self.x = -cursor-position.x + 2px;
+                                } else if cursor-position.x + self.x > parent.width - 4px - self.text-cursor-width {
+                                    self.x = parent.width - cursor-position.x - 4px - self.text-cursor-width;
+                                }
+                            }
+                        }
+
+                        if root.query == "": Text {
+                            text: "Search Windows Recent…";
+                            color: #7f8da3;
+                            font-size: 14px;
+                            font-family: "Microsoft YaHei UI, Segoe UI, sans-serif";
+                            vertical-alignment: center;
                         }
                     }
                 }

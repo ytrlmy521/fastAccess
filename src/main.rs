@@ -11,14 +11,18 @@ use fastaccess::{
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::{
     cmp::Reverse,
-    path::PathBuf,
-    sync::{mpsc, Arc, RwLock},
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc, RwLock,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 
 slint::include_modules!();
 
 const RESULT_LIMIT: usize = 50;
+const APP_TITLE: &str = "FastAccess";
 
 fn main() -> Result<()> {
     let app = AppWindow::new().context("cannot create FastAccess window")?;
@@ -32,7 +36,28 @@ fn main() -> Result<()> {
     let cache_writer =
         CacheWriter::start(Arc::clone(&items), cache_file).context("cannot start cache writer")?;
 
-    install_ui_callbacks(&app, Arc::clone(&items), cache_writer.clone());
+    let launch_weak = app.as_weak();
+    let target_launcher = TargetLauncher::start(move |target, result| {
+        let Err(error) = result else {
+            return;
+        };
+        let message = format!("Cannot open {}: {error:#}", target.display());
+        let weak = launch_weak.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(app) = weak.upgrade() {
+                app.set_status_text(message.into());
+                let _ = show_and_activate(&app);
+            }
+        });
+    })
+    .context("cannot start target launcher")?;
+
+    install_ui_callbacks(
+        &app,
+        Arc::clone(&items),
+        cache_writer.clone(),
+        target_launcher,
+    );
     let explorer_items = Arc::clone(&items);
     let explorer_writer = cache_writer.clone();
     let explorer_weak = app.as_weak();
@@ -71,7 +96,7 @@ fn main() -> Result<()> {
         recent_collector.requester(),
     )?;
 
-    app.show().context("cannot show FastAccess window")?;
+    show_and_activate(&app)?;
     slint::run_event_loop_until_quit().context("Slint event loop failed")?;
     drop(explorer_tracker);
     drop(recent_collector);
@@ -85,6 +110,7 @@ fn install_ui_callbacks(
     app: &AppWindow,
     items: Arc<RwLock<Vec<RecentItem>>>,
     cache_writer: CacheWriter,
+    target_launcher: TargetLauncher,
 ) {
     let weak = app.as_weak();
     let search_items = Arc::clone(&items);
@@ -108,7 +134,7 @@ fn install_ui_callbacks(
             return;
         };
         let target = PathBuf::from(item.path.as_str());
-        if let Err(error) = open_target(&target) {
+        if let Err(error) = target_launcher.try_open(target.clone()) {
             app.set_status_text(format!("Cannot open item: {error:#}").into());
             return;
         }
@@ -285,12 +311,16 @@ fn start_hotkey(
         let recent_collector = recent_collector.clone();
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(app) = weak.upgrade() {
-                if app.window().is_visible() {
+                if app.window().is_visible() && is_fastaccess_foreground() {
                     let _ = app.hide();
                 } else {
                     app.set_query(SharedString::default());
                     render_query(&app, &items, "");
-                    let _ = app.show();
+                    if let Err(error) = show_and_activate(&app) {
+                        app.set_status_text(
+                            format!("Cannot activate FastAccess: {error:#}").into(),
+                        );
+                    }
                     recent_collector.request_refresh();
                 }
             }
@@ -300,6 +330,112 @@ fn start_hotkey(
     // The listener owns its thread and lives until process shutdown.
     drop(listener);
     Ok(())
+}
+
+#[derive(Clone)]
+struct TargetLauncher {
+    sender: mpsc::SyncSender<PathBuf>,
+    busy: Arc<AtomicBool>,
+}
+
+impl TargetLauncher {
+    fn start<F>(on_complete: F) -> std::io::Result<Self>
+    where
+        F: Fn(PathBuf, Result<()>) + Send + 'static,
+    {
+        Self::start_with(open_target, on_complete)
+    }
+
+    fn start_with<O, F>(open: O, on_complete: F) -> std::io::Result<Self>
+    where
+        O: Fn(&Path) -> Result<()> + Send + 'static,
+        F: Fn(PathBuf, Result<()>) + Send + 'static,
+    {
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let busy = Arc::new(AtomicBool::new(false));
+        let worker_busy = Arc::clone(&busy);
+        let _handle = std::thread::Builder::new()
+            .name("fastaccess-target-launcher".into())
+            .spawn(move || {
+                while let Ok(target) = receiver.recv() {
+                    let result = open(&target);
+                    worker_busy.store(false, Ordering::Release);
+                    on_complete(target, result);
+                }
+            })?;
+        Ok(Self { sender, busy })
+    }
+
+    fn try_open(&self, target: PathBuf) -> Result<()> {
+        if self.busy.swap(true, Ordering::AcqRel) {
+            return Err(anyhow::anyhow!("another item is still opening"));
+        }
+
+        match self.sender.try_send(target) {
+            Ok(()) => Ok(()),
+            Err(mpsc::TrySendError::Full(_)) => {
+                self.busy.store(false, Ordering::Release);
+                Err(anyhow::anyhow!("target launcher is busy"))
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.busy.store(false, Ordering::Release);
+                Err(anyhow::anyhow!("target launcher is not running"))
+            }
+        }
+    }
+}
+
+fn show_and_activate(app: &AppWindow) -> Result<()> {
+    app.show().context("cannot show FastAccess window")?;
+    activate_fastaccess_window();
+    Ok(())
+}
+
+#[cfg(windows)]
+fn activate_fastaccess_window() {
+    use std::ptr;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        FindWindowW, SetForegroundWindow, SetWindowPos, ShowWindow, HWND_TOP, SWP_NOMOVE,
+        SWP_NOSIZE, SWP_SHOWWINDOW, SW_RESTORE,
+    };
+
+    let title: Vec<u16> = APP_TITLE.encode_utf16().chain(Some(0)).collect();
+    let window = unsafe { FindWindowW(ptr::null(), title.as_ptr()) };
+    if window.is_null() {
+        return;
+    }
+
+    unsafe {
+        ShowWindow(window, SW_RESTORE);
+        SetWindowPos(
+            window,
+            HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        );
+        SetForegroundWindow(window);
+    }
+}
+
+#[cfg(not(windows))]
+fn activate_fastaccess_window() {}
+
+#[cfg(windows)]
+fn is_fastaccess_foreground() -> bool {
+    use std::ptr;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowW, GetForegroundWindow};
+
+    let title: Vec<u16> = APP_TITLE.encode_utf16().chain(Some(0)).collect();
+    let window = unsafe { FindWindowW(ptr::null(), title.as_ptr()) };
+    !window.is_null() && unsafe { GetForegroundWindow() == window }
+}
+
+#[cfg(not(windows))]
+fn is_fastaccess_foreground() -> bool {
+    true
 }
 
 fn format_relative_time(observed_at_ms: u64) -> String {
@@ -315,5 +451,53 @@ fn format_relative_time(observed_at_ms: u64) -> String {
         3_600..=86_399 => format!("{} hr ago", elapsed_seconds / 3_600),
         86_400..=604_799 => format!("{} d ago", elapsed_seconds / 86_400),
         _ => format!("{} wk ago", elapsed_seconds / 604_800),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn target_launcher_keeps_slow_shell_work_off_the_calling_thread() {
+        let (worker_tx, worker_rx) = mpsc::sync_channel(0);
+        let (release_tx, release_rx) = mpsc::sync_channel(0);
+        let (completed_tx, completed_rx) = mpsc::sync_channel(0);
+
+        let launcher = TargetLauncher::start_with(
+            move |_target| {
+                worker_tx.send(std::thread::current().id()).unwrap();
+                release_rx.recv().unwrap();
+                Ok(())
+            },
+            move |_target, result| {
+                completed_tx.send(result.is_ok()).unwrap();
+            },
+        )
+        .unwrap();
+        let (request_tx, request_rx) = mpsc::sync_channel(0);
+        let request_launcher = launcher.clone();
+        let caller = std::thread::spawn(move || {
+            let result = request_launcher.try_open(PathBuf::from("slow-target"));
+            request_tx
+                .send((std::thread::current().id(), result.is_ok()))
+                .unwrap();
+        });
+
+        let worker_thread = worker_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        let (caller_thread, request_succeeded) =
+            request_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert!(request_succeeded);
+        assert_ne!(worker_thread, caller_thread);
+        assert!(launcher
+            .try_open(PathBuf::from("second-target"))
+            .unwrap_err()
+            .to_string()
+            .contains("still opening"));
+
+        release_tx.send(()).unwrap();
+        assert!(completed_rx.recv_timeout(Duration::from_secs(1)).unwrap());
+        caller.join().unwrap();
     }
 }

@@ -9,7 +9,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-pub const CACHE_SCHEMA_VERSION: u32 = 1;
+// Schema 1 may contain paths decoded with the wrong Windows ANSI code page.
+// The original bytes are unavailable, so rebuilding from Windows Recent is the
+// only lossless migration.
+pub const CACHE_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheFile {
@@ -165,6 +168,33 @@ mod tests {
         assert_eq!(loaded.schema_version, CACHE_SCHEMA_VERSION);
         assert_eq!(loaded.items, items);
 
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn rejects_legacy_cache_with_ambiguous_path_encoding() {
+        let directory = std::env::temp_dir().join(format!(
+            "fastaccess-cache-test-legacy-{}-{}",
+            std::process::id(),
+            now_ms()
+        ));
+        let path = directory.join("cache.json");
+        fs::create_dir_all(&directory).unwrap();
+        let legacy = CacheFile {
+            schema_version: 1,
+            generated_at: 123,
+            items: vec![RecentItem::new(
+                PathBuf::from(r"E:\ÖÇÓ°µ¼³ö"),
+                123,
+                ItemKind::Folder,
+            )],
+        };
+        serde_json::to_writer(File::create(&path).unwrap(), &legacy).unwrap();
+
+        let error = load_cache(&path).unwrap_err().to_string();
+
+        assert!(error.contains("unsupported cache schema 1"));
         let _ = fs::remove_file(path);
         let _ = fs::remove_dir(directory);
     }

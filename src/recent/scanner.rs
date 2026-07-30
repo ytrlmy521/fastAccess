@@ -2,6 +2,7 @@ use super::{known_folder::recent_folder, shortcut::parse_shortcut};
 use crate::model::RecentItem;
 use anyhow::{Context, Result};
 use std::{
+    cmp::Reverse,
     collections::HashSet,
     fs,
     path::Path,
@@ -24,7 +25,7 @@ pub fn scan_recent() -> Result<ScanReport> {
 
     report
         .items
-        .sort_unstable_by(|a, b| b.observed_at_ms.cmp(&a.observed_at_ms));
+        .sort_unstable_by_key(|item| Reverse(item.observed_at_ms));
     Ok(report)
 }
 
@@ -55,7 +56,7 @@ fn scan_lnk_directory(
         candidates.push((path, observed_at_ms));
     }
 
-    candidates.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    candidates.sort_unstable_by_key(|candidate| Reverse(candidate.1));
     for (path, observed_at_ms) in candidates {
         match parse_shortcut(&path, observed_at_ms) {
             Ok(item) => {

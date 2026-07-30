@@ -32,7 +32,7 @@ pub fn cache_path() -> Result<PathBuf> {
     #[cfg(windows)]
     {
         let base = env::var_os("LOCALAPPDATA").context("LOCALAPPDATA is not defined")?;
-        return Ok(PathBuf::from(base).join("FastAccess").join("cache.json"));
+        Ok(PathBuf::from(base).join("FastAccess").join("cache.json"))
     }
 
     #[cfg(not(windows))]

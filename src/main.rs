@@ -10,6 +10,7 @@ use fastaccess::{
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::{
+    cmp::Reverse,
     path::PathBuf,
     sync::{mpsc, Arc, RwLock},
     time::{SystemTime, UNIX_EPOCH},
@@ -25,7 +26,7 @@ fn main() -> Result<()> {
     let mut cached_items = load_cache(&cache_file)
         .map(|cache| cache.items)
         .unwrap_or_default();
-    cached_items.sort_unstable_by(|a, b| b.observed_at_ms.cmp(&a.observed_at_ms));
+    cached_items.sort_unstable_by_key(|item| Reverse(item.observed_at_ms));
     cached_items.truncate(MAX_RECENT_ITEMS);
     let items = Arc::new(RwLock::new(cached_items));
     let cache_writer =
